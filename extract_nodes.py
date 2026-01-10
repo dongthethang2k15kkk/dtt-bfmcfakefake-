@@ -1,13 +1,13 @@
 import xml.etree.ElementTree as ET
-import xml.dom.minidom  # <--- Thêm thư viện này để format đẹp
+import xml.dom.minidom  
 import math
 
-# ================= CẤU HÌNH =================
+
 INPUT_FILE = "BFMC_Track_graph.graphml"        
 OUTPUT_FILE = "Competition_track_graphfake.graphml" 
 REAL_DISTANCE = 3                           
 
-# ================= HÀM XỬ LÝ =================
+
 
 def read_and_convert():
     print(f"--- Đang đọc file {INPUT_FILE}... ---")
