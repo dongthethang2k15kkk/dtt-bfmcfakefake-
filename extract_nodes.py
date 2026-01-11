@@ -75,16 +75,37 @@ def read_and_convert():
 
         # 3. Xử lý TẤT CẢ các Edge (Giữ nguyên tính kết nối)
         final_edges = []
+        # --- ĐOẠN CẦN SỬA (Thay thế từ dòng 76 đến 83 trong code cũ) ---
+       # --- ĐOẠN CODE ĐÃ SỬA ---
         for edge in root.findall(".//g:edge", ns):
             src = edge.get('source')
             tgt = edge.get('target')
             
-            # Chỉ lấy cạnh nếu cả 2 đầu đều là node hợp lệ (không phải ORIGIN/REF)
+            # Giá trị mặc định
+            is_dotted = False
+            
+            # Quét thẻ data để tìm thuộc tính dotted (ID là d10 trong file code1)
+            for data in edge.findall("g:data", ns):
+                # QUAN TRỌNG: Sửa d2 thành d10 khớp với file input
+                if data.get('key') == 'd10': 
+                    if data.text:
+                        # Chuẩn hóa về chữ thường và xóa khoảng trắng thừa
+                        val = data.text.strip().lower()
+                        
+                        # Logic: 1 hoặc 'true' => True
+                        if val == 'true' or val == '1':
+                            is_dotted = True
+                        # Logic: 0 hoặc 'false' => False (mặc định đã là False rồi)
+                        elif val == 'false' or val == '0':
+                            is_dotted = False
+
+            # Chỉ lấy cạnh nếu cả 2 đầu đều là node hợp lệ
             if src in node_mapping and tgt in node_mapping:
                 new_src = node_mapping[src]
                 new_tgt = node_mapping[tgt]
-                final_edges.append((new_src, new_tgt))
-
+                # Lưu vào danh sách
+                final_edges.append((new_src, new_tgt, is_dotted)) 
+        # ------------------------
         print(f"-> Đã xử lý {len(final_edges)} edges.")
         
         return final_nodes, final_edges
@@ -120,11 +141,15 @@ def export_to_xml(nodes, edges):
         d1 = ET.SubElement(node, 'data', {'key': 'd1'})
         d1.text = f"{y:.4f}"
 
-    # Ghi Edges
-    for src, tgt in edges:
+    
+    # --- ĐOẠN CẦN SỬA (Thay thế từ dòng 116 đến 119) ---
+    # Phải unpack thêm biến is_dotted
+    for src, tgt, is_dotted in edges:
         edge = ET.SubElement(graph, 'edge', {'source': src, 'target': tgt})
-        d2 = ET.SubElement(edge, 'data', {'key': 'd2'})
-        d2.text = "False"
+        d2 = ET.SubElement(edge, 'data', {'key': 'd2'}) # d2 này là ID trong file OUTPUT
+        # Ghi giá trị True/False thực tế vào
+        d2.text = str(is_dotted) 
+    # ---------------------------------------------------
 
     # Format XML đẹp
     xml_str = ET.tostring(root, encoding='utf-8')
