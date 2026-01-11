@@ -3,7 +3,7 @@ import math
 import os
 
 # ================= CẤU HÌNH (QUAN TRỌNG) =================
-INPUT_FILE = "Competition_track_graphfake.graphml"  # File map đã convert sang mét
+INPUT_FILE = "Competition_track_graph!.graphml"  # File map đã convert sang mét
 WHEELBASE = 0.26          # Chiều dài trục cơ sở (mét) - ĐO XE THẬT RỒI SỬA SỐ NÀY
 MAX_STEERING_ANGLE = 25   # Góc lái tối đa (độ)
 

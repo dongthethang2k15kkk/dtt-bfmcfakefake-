@@ -1,13 +1,10 @@
 import xml.etree.ElementTree as ET
-import xml.dom.minidom  
+import xml.dom.minidom
 import math
 
-
-INPUT_FILE = "BFMC_Track_graph.graphml"        
-OUTPUT_FILE = "Competition_track_graphfake.graphml" 
-REAL_DISTANCE = 3                           
-
-
+INPUT_FILE = "BFMC_Track_graph!.graphml"        
+OUTPUT_FILE = "Competition_track_graph!.graphml" 
+REAL_DISTANCE = 3.0                             
 
 def read_and_convert():
     print(f"--- Đang đọc file {INPUT_FILE}... ---")
@@ -16,10 +13,11 @@ def read_and_convert():
         root = tree.getroot()
         ns = {'g': 'http://graphml.graphdrawing.org/xmlns', 'y': 'http://www.yworks.com/xml/graphml'}
         
-        raw_nodes = {}
-        origin_pos, ref_pos = None, None
+        # 1. Tìm ORIGIN và REF_X để tính tỷ lệ
+        origin_pos = None
+        ref_pos = None
         
-        # 1. Lấy thông tin Nodes
+        # Quét lần 1: Chỉ để tìm 2 điểm mốc
         for node in root.findall(".//g:node", ns):
             geo = node.find(".//y:Geometry", ns)
             if geo is None: continue
@@ -36,59 +34,68 @@ def read_and_convert():
             elif "REF_X" in lbl: 
                 ref_pos = (x, y)
                 print(f"-> Tìm thấy REF_X tại: {ref_pos}")
-            else: 
-                raw_nodes[node.get('id')] = {'x': x, 'y': y}
 
         if not origin_pos or not ref_pos: 
             print("LỖI: Không tìm thấy node 'ORIGIN' hoặc 'REF_X'.")
-            return None
-        
-        # 2. Tính tỷ lệ
+            return None, None
+
+        # Tính tỷ lệ
         pixel_dist = math.sqrt((ref_pos[0]-origin_pos[0])**2 + (ref_pos[1]-origin_pos[1])**2)
         scale = REAL_DISTANCE / pixel_dist
         print(f"-> Tỷ lệ: 1 đơn vị = {scale:.6f} m")
-        
-        # 3. Lấy Edges
-        adjacency = {}
-        for edge in root.findall(".//g:edge", ns):
-            adjacency[edge.get('source')] = edge.get('target')
 
-        # 4. Sắp xếp điểm
-        ordered_pts = []
-        targets = set(adjacency.values())
-        start_node_id = list(adjacency.keys())[0] 
-        for n in adjacency.keys():
-            if n not in targets: 
-                start_node_id = n
-                break
-                
-        curr = start_node_id
-        loop_check = set()
+        # 2. Xử lý TẤT CẢ các Node (Không bỏ sót thằng nào)
+        final_nodes = {} # Map: old_id -> new_data
+        node_mapping = {} # Map: old_id -> new_id (0, 1, 2...)
         
-        while curr:
-            if curr in raw_nodes:
-                rx, ry = raw_nodes[curr]['x'], raw_nodes[curr]['y']
-                mx = (rx - origin_pos[0]) * scale
-                my = (origin_pos[1] - ry) * scale 
-                ordered_pts.append((mx, my))
+        counter = 0
+        for node in root.findall(".//g:node", ns):
+            old_id = node.get('id')
+            geo = node.find(".//y:Geometry", ns)
+            if geo is None: continue
             
-            loop_check.add(curr)
-            curr = adjacency.get(curr)
-            if curr == start_node_id or curr in loop_check: 
-                if curr == start_node_id and len(ordered_pts) > 0:
-                     ordered_pts.append(ordered_pts[0])
-                break
+            # Bỏ qua node ORIGIN và REF_X trong danh sách điểm chạy xe
+            node_label = node.find(".//y:NodeLabel", ns)
+            lbl = node_label.text.strip() if node_label is not None else ""
+            if "ORIGIN" in lbl or "REF_X" in lbl:
+                continue
 
-        return ordered_pts
+            rx = float(geo.get('x'))
+            ry = float(geo.get('y'))
+            
+            # Chuyển đổi tọa độ
+            mx = (rx - origin_pos[0]) * scale
+            my = (origin_pos[1] - ry) * scale 
+            
+            final_nodes[counter] = (mx, my)
+            node_mapping[old_id] = str(counter)
+            counter += 1
+
+        print(f"-> Đã xử lý {len(final_nodes)} nodes.")
+
+        # 3. Xử lý TẤT CẢ các Edge (Giữ nguyên tính kết nối)
+        final_edges = []
+        for edge in root.findall(".//g:edge", ns):
+            src = edge.get('source')
+            tgt = edge.get('target')
+            
+            # Chỉ lấy cạnh nếu cả 2 đầu đều là node hợp lệ (không phải ORIGIN/REF)
+            if src in node_mapping and tgt in node_mapping:
+                new_src = node_mapping[src]
+                new_tgt = node_mapping[tgt]
+                final_edges.append((new_src, new_tgt))
+
+        print(f"-> Đã xử lý {len(final_edges)} edges.")
+        
+        return final_nodes, final_edges
 
     except Exception as e:
         print(f"Lỗi đọc file: {e}")
-        return None
+        return None, None
 
-def export_to_xml(points):
+def export_to_xml(nodes, edges):
     print(f"--- Đang xuất ra file {OUTPUT_FILE}... ---")
     
-    # Tạo namespace
     ET.register_namespace('', "http://graphml.graphdrawing.org/xmlns")
     ET.register_namespace('xsi', "http://www.w3.org/2001/XMLSchema-instance")
     
@@ -98,46 +105,40 @@ def export_to_xml(points):
         'xsi:schemaLocation': "http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"
     })
 
-    # Key định nghĩa
     ET.SubElement(root, 'key', {'id': 'd2', 'for': 'edge', 'attr.name': 'dotted', 'attr.type': 'boolean'})
     ET.SubElement(root, 'key', {'id': 'd1', 'for': 'node', 'attr.name': 'y', 'attr.type': 'double'})
     ET.SubElement(root, 'key', {'id': 'd0', 'for': 'node', 'attr.name': 'x', 'attr.type': 'double'})
 
     graph = ET.SubElement(root, 'graph', {'edgedefault': 'directed'})
 
-    # Tạo Nodes
-    for i, (x, y) in enumerate(points):
-        node = ET.SubElement(graph, 'node', {'id': str(i)})
+    # Ghi Nodes
+    # nodes là dict {id_mới: (x, y)}
+    for new_id, (x, y) in nodes.items():
+        node = ET.SubElement(graph, 'node', {'id': str(new_id)})
         d0 = ET.SubElement(node, 'data', {'key': 'd0'})
-        d0.text = f"{x:.2f}" 
+        d0.text = f"{x:.4f}" 
         d1 = ET.SubElement(node, 'data', {'key': 'd1'})
-        d1.text = f"{y:.2f}"
+        d1.text = f"{y:.4f}"
 
-    # Tạo Edges
-    for i in range(len(points) - 1):
-        edge = ET.SubElement(graph, 'edge', {'source': str(i), 'target': str(i+1)})
+    # Ghi Edges
+    for src, tgt in edges:
+        edge = ET.SubElement(graph, 'edge', {'source': src, 'target': tgt})
         d2 = ET.SubElement(edge, 'data', {'key': 'd2'})
         d2.text = "False"
 
-    # --- ĐOẠN NÀY LÀM ĐẸP XML ---
-    # Chuyển cây XML thành chuỗi
+    # Format XML đẹp
     xml_str = ET.tostring(root, encoding='utf-8')
-    
-    # Dùng minidom để format lại (xuống dòng, thụt đầu dòng)
     dom = xml.dom.minidom.parseString(xml_str)
     pretty_xml = dom.toprettyxml(indent="  ")
-    
-    # Xóa các dòng trắng thừa do minidom tạo ra (nếu có)
     clean_xml = '\n'.join([line for line in pretty_xml.split('\n') if line.strip()])
 
-    # Ghi đè vào file
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         f.write(clean_xml)
         
-    print(f"✅ Xong! File {OUTPUT_FILE} đã được format đẹp.")
+    print(f"✅ Xong! File {OUTPUT_FILE} đã được export đầy đủ cấu trúc đồ thị.")
 
 # ================= CHẠY CHƯƠNG TRÌNH =================
 if __name__ == "__main__":
-    raw_points = read_and_convert()
-    if raw_points:
-        export_to_xml(raw_points)
+    nodes_data, edges_data = read_and_convert()
+    if nodes_data:
+        export_to_xml(nodes_data, edges_data)
