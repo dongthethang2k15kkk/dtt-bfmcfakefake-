@@ -126,6 +126,6 @@ def run_layered_optimization(graph_file, img_file, points_list):
     plt.show()
 
 # --- CHẠY CHƯƠNG TRÌNH ---
-my_waypoints = ["1", "69", "36", "67"] 
+my_waypoints = ["1", "89", "36", "67"] 
 # Đảm bảo file .graphml và .png nằm cùng thư mục
 run_layered_optimization("Competition_track_graph!.graphml", "Sahinh.png .", my_waypoints)

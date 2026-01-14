@@ -1,3 +1,5 @@
+### HỆ THỐNG TÌM RA BỘ SỐ EXTENT CHUẨN CHO ẢNH NỀN SAHINH.PNG ###
+
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg

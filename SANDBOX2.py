@@ -1,3 +1,5 @@
+### CŨNG LÀ HỆ THỐNG TÌM RA BỘ SỐ EXTENT CHUẨN NHƯNG? ### 
+
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg

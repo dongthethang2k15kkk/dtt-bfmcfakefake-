@@ -1,3 +1,5 @@
+### HỆ THỐNG CHUYỂN ĐỔI FILE GRAPHML(LOẠI BỎ DỮ LIỆU RÁC) ###
+
 import xml.etree.ElementTree as ET
 import xml.dom.minidom
 import math
